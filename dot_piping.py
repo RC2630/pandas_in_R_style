@@ -18,12 +18,18 @@ class Pipable:
         = func(1, 2, 3, 4, a = 5, b = 6)
     '''
 
-    ALL_AVAILABLE_CALLABLES: dict[str, Callable] = {}
-    GET_AVAILABLE_CALLABLES: str = "{key: value for key, value in ({name: getattr(__import__('builtins'), name) for name in dir(__import__('builtins'))} | globals() | locals()).items() if callable(value)}"
+    BUILT_IN_CALLABLES: dict[str, Callable] = {
+        name: getattr(__import__('builtins'), name)
+        for name in dir(__import__('builtins'))
+        if callable(getattr(__import__('builtins'), name))
+    }
+    ALL_AVAILABLE_CALLABLES: dict[str, Callable] = BUILT_IN_CALLABLES.copy()
+    GET_AVAILABLE_CALLABLES: str = \
+        "{key: value for key, value in (globals() | locals()).items() if callable(value)}"
 
     @classmethod
     def set_available_callables(cls, available_callables: dict[str, Callable]) -> None:
-        cls.ALL_AVAILABLE_CALLABLES = available_callables
+        cls.ALL_AVAILABLE_CALLABLES = cls.BUILT_IN_CALLABLES | available_callables
 
     def __init__(self, value: Any, lookup_free_before_attr: bool = False) -> None:
         self.value: Any = value
