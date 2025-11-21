@@ -1,5 +1,4 @@
-from __future__ import annotations
-from typing import Any, Callable, overload, Concatenate
+from typing import Any, Callable, overload, Concatenate, Final
 
 class Pipable[T]:
 
@@ -38,14 +37,14 @@ class Pipable[T]:
     class ValueGetter:
         pass
 
-    VALUE: ValueGetter = ValueGetter()
-    BUILT_IN_CALLABLES: dict[str, Callable] = {
+    VALUE: Final[ValueGetter] = ValueGetter()
+    BUILT_IN_CALLABLES: Final[dict[str, Callable]] = {
         name: getattr(__import__('builtins'), name)
         for name in dir(__import__('builtins'))
         if callable(getattr(__import__('builtins'), name))
     }
     ALL_AVAILABLE_CALLABLES: dict[str, Callable] = BUILT_IN_CALLABLES.copy()
-    GET_AVAILABLE_CALLABLES: str = \
+    GET_AVAILABLE_CALLABLES: Final[str] = \
         "{key: value for key, value in (globals() | locals()).items() if callable(value)}"
 
     @classmethod
@@ -66,11 +65,11 @@ class Pipable[T]:
         self.lookup_free_before_attr = lookup_free_before_attr
         return self
     
-    def __call__(self, *args: Any, **kwargs: Any) -> Pipable:
+    def __call__(self, *args: Any, **kwargs: Any) -> Pipable[Any]:
         assert callable(self.value)
         return Pipable(self.value(*args, **kwargs), self.lookup_free_before_attr)
     
-    def __getattr__(self, attr: str) -> Pipable:
+    def __getattr__(self, attr: str) -> Pipable[Any]:
 
         if not self.lookup_free_before_attr and hasattr(self.value, attr):
             return Pipable(getattr(self.value, attr), self.lookup_free_before_attr)
@@ -130,7 +129,7 @@ class Pipable[T]:
             tuple[Callable, Any] |
             Callable |
             Pipable.ValueGetter
-    ) -> Pipable | T:
+    ) -> Pipable[Any] | T:
         
         f: Any = func_and_args
         arg_to_result_map: dict[Callable[[], bool], Callable[[], Any]] = {
