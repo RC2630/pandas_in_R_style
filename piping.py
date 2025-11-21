@@ -1,7 +1,7 @@
 from __future__ import annotations
-from typing import Any, Callable, overload
+from typing import Any, Callable, overload, Concatenate
 
-class Pipable:
+class Pipable[T]:
 
     '''
     DOT PIPE STYLE
@@ -52,8 +52,8 @@ class Pipable:
     def set_available_callables(cls, available_callables: dict[str, Callable]) -> None:
         cls.ALL_AVAILABLE_CALLABLES = cls.BUILT_IN_CALLABLES | available_callables
 
-    def __init__(self, value: Any, lookup_free_before_attr: bool = False) -> None:
-        self.value: Any = value
+    def __init__(self, value: T, lookup_free_before_attr: bool = False) -> None:
+        self.value: T = value
         self.lookup_free_before_attr: bool = lookup_free_before_attr
     
     def __str__(self) -> str:
@@ -62,14 +62,15 @@ class Pipable:
     def __repr__(self) -> str:
         return repr(self.value)
     
-    def set_lookup_free_before_attr(self, lookup_free_before_attr: bool) -> Pipable:
+    def set_lookup_free_before_attr(self, lookup_free_before_attr: bool) -> Pipable[T]:
         self.lookup_free_before_attr = lookup_free_before_attr
         return self
     
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+    def __call__(self, *args: Any, **kwargs: Any) -> Pipable:
+        assert callable(self.value)
         return Pipable(self.value(*args, **kwargs), self.lookup_free_before_attr)
     
-    def __getattr__(self, attr: str) -> Any:
+    def __getattr__(self, attr: str) -> Pipable:
 
         if not self.lookup_free_before_attr and hasattr(self.value, attr):
             return Pipable(getattr(self.value, attr), self.lookup_free_before_attr)
@@ -86,33 +87,39 @@ class Pipable:
 
     # func() has >= 3 arguments & func() has **kwargs
     @overload
-    def __rshift__(
-        self, func_and_args: tuple[Callable, tuple[Any, ...], dict[str, Any]]
-    ) -> Pipable: ...
+    def __rshift__[**P, R](
+        self, func_and_args: tuple[Callable[Concatenate[T, P], R], tuple[Any, ...], dict[str, Any]]
+    ) -> Pipable[R]: ...
 
     # func() has 2 arguments & func() has **kwargs
     @overload
-    def __rshift__(self, func_and_args: tuple[Callable, Any, dict[str, Any]]) -> Pipable: ...
+    def __rshift__[S, R](
+        self, func_and_args: tuple[Callable[[T, S], R], S, dict[str, Any]]
+    ) -> Pipable[R]: ...
 
     # func() has 1 argument & func() has **kwargs
     @overload
-    def __rshift__(self, func_and_args: tuple[Callable, dict[str, Any]]) -> Pipable: ...
+    def __rshift__[R](
+        self, func_and_args: tuple[Callable[[T], R], dict[str, Any]]
+    ) -> Pipable[R]: ...
 
     # func() has >= 3 arguments
     @overload
-    def __rshift__(self, func_and_args: tuple[Callable, tuple[Any, ...]]) -> Pipable: ...
+    def __rshift__[**P, R](
+        self, func_and_args: tuple[Callable[Concatenate[T, P], R], tuple[Any, ...]]
+    ) -> Pipable[R]: ...
 
     # func() has 2 arguments
     @overload
-    def __rshift__(self, func_and_args: tuple[Callable, Any]) -> Pipable: ...
+    def __rshift__[S, R](self, func_and_args: tuple[Callable[[T, S], R], S]) -> Pipable[R]: ...
 
     # func() has 1 argument
     @overload
-    def __rshift__(self, func_and_args: Callable) -> Pipable: ...
+    def __rshift__[R](self, func_and_args: Callable[[T], R]) -> Pipable[R]: ...
 
     # piping just to get the final value
     @overload
-    def __rshift__(self, func_and_args: Pipable.ValueGetter) -> Any: ...
+    def __rshift__(self, func_and_args: Pipable.ValueGetter) -> T: ...
 
     def __rshift__(
         self, func_and_args:
@@ -123,7 +130,7 @@ class Pipable:
             tuple[Callable, Any] |
             Callable |
             Pipable.ValueGetter
-    ) -> Pipable | Any:
+    ) -> Pipable | T:
         
         f: Any = func_and_args
         arg_to_result_map: dict[Callable[[], bool], Callable[[], Any]] = {
